@@ -1,0 +1,319 @@
+---
+title: "Figures"
+author: "Ke Liu"
+date: "September 20, 2017"
+output: html_document
+---
+
+```{r,echo=FALSE, include=FALSE}
+require(plyr)
+require(dplyr)
+require(ggplot2)
+require(foreach)
+require(edgeR)
+require(pheatmap)
+
+prism.plot <- function(x,y,...){
+    par(mar=c(5.1,5.1,1.1,1.1))
+    arg.list          <- list(...)
+    arg.list$cex.lab  <- NULL
+    arg.list$cex.axis <- NULL
+    arg.list$font     <- NULL
+    plot(x=x,y=y,cex.lab=2.5,font=2,cex.axis=2,...)
+
+    axis(side = 1,labels = FALSE,lwd = 13,col = 'black',at=c(2*min(x) - max(x),2 *max(x) - min(x)))
+    axis(side = 1,labels = FALSE,lwd.ticks = 13)
+    axis(side = 3,labels = FALSE,lwd = 3,col = 'white',at=c(2*min(x) - max(x),2 *max(x) - min(x)))
+
+    axis(side = 2, lwd = 13,col = 'black',labels = TRUE,at=c(2*min(y) - max(y),2*max(y) - min(y)))
+    axis(side = 2,labels = FALSE,lwd.ticks = 13)
+    axis(side = 4, lwd = 3,col = 'white',labels = TRUE,at=c(2*min(y) - max(y),2*max(y) - min(y)))
+
+}
+draw.MA.plot <- function(M,A,significant.flag){
+    M.abs.max <- max(abs(M))  
+    prism.plot(x=A,y=M,xlab='A',ylab='M',ylim=c(-1 * M.abs.max,M.abs.max),col='grey',pch=19,cex=1.5)
+    points(x=A[flag],y=M[flag],cex=1.5,pch=19,col='red')
+    abline(h=0,lwd=3,lty=3)
+}
+
+```
+
+# Section I. Organize mouse CISTROME scan results.
+The pupose of the scan is to extract candidate TFs which may show enriment on RT.Given a RT, we have two different methods to rank the TF:   
+<b> 1. Rank all TF according to the proportion of reads coming from the RT (regarding to all reads ) </b>  
+<b> 2. Rank all TF according to the prorpotion of reads coming from the RT (regarding to only the reads mapped to RT )</b> 
+
+```{r}
+setwd('~/Project/Martin/')
+load('RData//mouse.chip.seq.csv.chip.seq.results.RData')
+
+exp.meta             <- ddply(exp.meta,.(ip),function(x) x[1,])
+exp.meta$exp.name    <- gsub(x=exp.meta$exp.name,pattern="\\.\\d+",replacement = "",perl=TRUE)
+ip.srr.id            <- exp.meta$ip %>% as.character 
+ip.srr.bam           <- paste(ip.srr.id,".all.rmdup.bam",sep='')
+rt.read.count.matrix <- rt.read.count.matrix[,ip.srr.bam]
+s                    <- apply(rt.read.count.matrix,2,sum)
+exp.meta             <- exp.meta[s>0,]
+rt.read.count.matrix <- rt.read.count.matrix[,s >0]
+
+rt.fraction.matrix.v1 <- foreach(j = 1:ncol(rt.read.count.matrix),.combine='cbind') %do% {
+    f <- rt.read.count.matrix[,j]  / lib.size[colnames(rt.read.count.matrix)[j]]
+    f
+}
+colnames(rt.fraction.matrix.v1) <- colnames(rt.read.count.matrix)
+
+rt.fraction.matrix.v2 <- foreach(j = 1:ncol(rt.read.count.matrix),.combine='cbind') %do% {
+    f <- rt.read.count.matrix[,j]  / sum(rt.read.count.matrix[,j]) 
+    f
+}
+colnames(rt.fraction.matrix.v2) <- colnames(rt.read.count.matrix)
+
+
+rt.TF.ranking.v1 <- foreach(i = 1:nrow(rt.fraction.matrix.v1),.combine='rbind') %do% {
+    row        <- rt.fraction.matrix.v1[i,]
+    row        <- scale(row,center = TRUE,scale = TRUE)
+    names(row) <- paste(exp.meta$exp.name,row,exp.meta$ip,sep="_")
+    row        <- sort(row,decreasing = TRUE)
+    names(row)
+}
+rownames(rt.TF.ranking.v1) <- rownames(rt.fraction.matrix.v1)
+
+rt.TF.ranking.v2 <- foreach(i = 1:nrow(rt.fraction.matrix.v2),.combine='rbind') %do% {
+  row        <- rt.fraction.matrix.v2[i,]
+  row        <- scale(row,center = TRUE,scale = TRUE)
+  names(row) <- paste(exp.meta$exp.name,row,exp.meta$ip,sep="_")
+  row        <- sort(row,decreasing = TRUE)
+  names(row)
+}
+rownames(rt.TF.ranking.v2) <- rownames(rt.fraction.matrix.v2)
+if(file.exists('Results/mouse.rt.TF.ranking.matrix.v1.csv') == FALSE){
+    write.csv(x=rt.TF.ranking.v1 %>% t,file="Results/mouse.rt.TF.ranking.matrix.v1.csv",row.names=FALSE,quote=FALSE)
+    write.csv(x=rt.TF.ranking.v2 %>% t,file="Results/mouse.rt.TF.ranking.matrix.v2.csv",row.names=FALSE,quote=FALSE)
+}
+```
+
+<b>Generate the bar plot to show TF regulation specificity</b>
+```{r}
+df <- foreach(i = 1:nrow(rt.fraction.matrix.v1),.combine='rbind') %do% {
+    row        <- rt.fraction.matrix.v1[i,]
+    row        <- scale(row,center = TRUE,scale = TRUE)
+    TF.name    <- exp.meta$exp.name[row >=3]
+    rt.name    <- rownames(rt.fraction.matrix.v1)[i]
+    if(length(TF.name) ==0){
+        TF.name <- NA  
+    }
+    data.frame(rt.name=rt.name,TF.name=TF.name)
+}
+df <- unique(df)
+df <- df[is.na(df$TF.name)==FALSE,]
+
+TF.statistics           <- ddply(df,.(TF.name),nrow) %>% arrange(desc(V1))
+rownames(TF.statistics) <- TF.statistics$TF.name
+TF.statistics$TF.name   <- factor(TF.statistics$TF.name,levels=TF.statistics$TF.name)
+
+rt.statistics           <- ddply(df,.(rt.name),nrow) %>% arrange(desc(V1))
+rownames(rt.statistics) <- rt.statistics$rt.name
+rt.statistics$rt.name   <- factor(rt.statistics$rt.name,levels=rt.statistics$rt.name)
+
+
+ggplot(TF.statistics,aes(x=TF.name,y=V1)) + geom_bar(stat="identity",fill='black')+coord_flip()+theme(axis.text=element_text(size=8,face='bold'),axis.title.x=element_text(size=12,face='bold'), axis.text.x=element_text(size=12,face='bold')  ) + xlab('') + ylab('Number of retrotransopson families')
+```
+
+
+<b>Generate the heatmap to  visualize CISTROME analyze results, z-score cut.off =5 </b>
+```{r}
+cut.off <- 5
+rt.fraction.matrix.v1.zcore <- apply(rt.fraction.matrix.v1,1,scale) %>% t
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,1,function(x) max(x,na.rm=TRUE))
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[max.zscore >=cut.off,]
+rt.name                     <- rownames(rt.fraction.matrix.v1.zcore)
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,2,function(x) max(x,na.rm=TRUE))
+TF.name                     <- paste(exp.meta$exp.name[max.zscore >=cut.off],exp.meta$ip[max.zscore >=cut.off],sep="_")
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[,max.zscore >=cut.off]
+
+heatmap.data           <- sign(rt.fraction.matrix.v1.zcore) * sqrt(rt.fraction.matrix.v1.zcore %>% abs)
+rownames(heatmap.data) <- rownames(rt.fraction.matrix.v1.zcore)
+colnames(heatmap.data) <- TF.name
+
+rs           <- pheatmap( heatmap.data,cluster_rows = TRUE,cluster_cols = TRUE,show_rownames = FALSE,show_colnames = FALSE)
+
+heatmap.data <- heatmap.data[rs$tree_row$order,rs$tree_col$order]
+
+write.csv('Results/heatmap.data.z.larger.5.csv',x=heatmap.data,row.names=TRUE,col.names=TRUE,quote=FALSE)
+```
+
+<b>Generate the heatmap to  visualize CISTROME analyze results, z-score cut.off=3 </b>
+```{r}
+cut.off <- 3
+rt.fraction.matrix.v1.zcore <- apply(rt.fraction.matrix.v1,1,scale) %>% t
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,1,function(x) max(x,na.rm=TRUE))
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[max.zscore >=cut.off,]
+rt.name                     <- rownames(rt.fraction.matrix.v1.zcore)
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,2,function(x) max(x,na.rm=TRUE))
+TF.name                     <- paste(exp.meta$exp.name[max.zscore >=cut.off],exp.meta$ip[max.zscore >=cut.off],sep="_")
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[,max.zscore >=cut.off]
+
+heatmap.data           <- sign(rt.fraction.matrix.v1.zcore) * sqrt(rt.fraction.matrix.v1.zcore %>% abs)
+rownames(heatmap.data) <- rownames(rt.fraction.matrix.v1.zcore)
+colnames(heatmap.data) <- TF.name
+
+rs           <- pheatmap( heatmap.data,cluster_rows = TRUE,cluster_cols = TRUE,show_rownames = FALSE,show_colnames = FALSE)
+
+heatmap.data <- heatmap.data[rs$tree_row$order,rs$tree_col$order]
+
+write.csv('Results/heatmap.data.z.larger.3.csv',x=heatmap.data,row.names=TRUE,col.names=TRUE,quote=FALSE)
+```
+
+
+<b>Generate the heatmap to  visualize CISTROME analyze results, z-score no cutoff </b>
+```{r}
+cut.off <- -50
+rt.fraction.matrix.v1.zcore <- apply(rt.fraction.matrix.v1,1,scale) %>% t
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,1,function(x) max(x,na.rm=TRUE))
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[max.zscore >=cut.off,]
+rt.name                     <- rownames(rt.fraction.matrix.v1.zcore)
+
+max.zscore                  <- apply(rt.fraction.matrix.v1.zcore,2,function(x) max(x,na.rm=TRUE))
+TF.name                     <- paste(exp.meta$exp.name[max.zscore >=cut.off],exp.meta$ip[max.zscore >=cut.off],sep="_")
+rt.fraction.matrix.v1.zcore <- rt.fraction.matrix.v1.zcore[,max.zscore >=cut.off]
+
+heatmap.data           <- sign(rt.fraction.matrix.v1.zcore) * sqrt(rt.fraction.matrix.v1.zcore %>% abs)
+rownames(heatmap.data) <- rownames(rt.fraction.matrix.v1.zcore)
+colnames(heatmap.data) <- TF.name
+
+rs           <- pheatmap( heatmap.data,cluster_rows = TRUE,cluster_cols = TRUE,show_rownames = FALSE,show_colnames = FALSE)
+
+heatmap.data <- heatmap.data[rs$tree_row$order,rs$tree_col$order]
+
+write.csv('Results/heatmap.data.z.no.filtering.csv',x=heatmap.data,row.names=TRUE,col.names=TRUE,quote=FALSE)
+```
+
+
+
+
+
+
+
+# Section II. Results of Dux RNA-Seq experiments
+In this section, we generate two MA-plots to show the dose-depdent global RT induction of Dux
+```{r}
+setwd('~/Project/Martin/')
+load('RData//Dux.dox.csv.rna.seq.results.RData')
+Dux.id <- 'ENSMUSG00000075046.6'
+```
+
+###Dux.OE.MERVL.GFP.pos vs wildtype:high dose Dux over-expression
+```{r}
+gene.data <- gene.read.count.matrix[,c('SRR4032348.bam','SRR4032349.bam','SRR4032350.bam','SRR4032351.bam')]
+rt.data   <- rt.read.count.matrix[,c('SRR4032348.bam','SRR4032349.bam','SRR4032350.bam','SRR4032351.bam')]  
+de.data   <- rbind(gene.data,rt.data)
+flag      <- apply(de.data,1,function(x) sum(x>=10) >=4)
+de.data   <- de.data[flag,]
+
+edgeR.res <- DGEList(counts=round(de.data), 
+                     group=factor(c('Wild.type','Wild.type','Dux.OE.GFP.pos','Dux.OE.GFP.pos'),levels = c('Wild.type','Dux.OE.GFP.pos'))
+)
+edgeR.res <- calcNormFactors(edgeR.res, method="RLE")
+
+edgeR.res <- estimateCommonDisp(edgeR.res)
+edgeR.res <- estimateTagwiseDisp(edgeR.res)
+et        <- exactTest(edgeR.res)
+de.res    <- topTags(et, n=Inf)$table
+rt.table  <- de.res[!grepl(x = rownames(de.res),pattern = 'ENS'),]
+
+flag      <- rt.table$FDR<0.01 & rt.table$logFC>1 
+draw.MA.plot(A=rt.table$logCPM,M=rt.table$logFC,significant.flag = flag)
+```
+
+###Dux.OE.MERVL.GFP.neg vs wildtype:low dose Dux over-expression
+```{r}
+gene.data <- gene.read.count.matrix[,c('SRR4032348.bam','SRR4032349.bam','SRR4032352.bam','SRR4032353.bam')]
+rt.data   <- rt.read.count.matrix[,c('SRR4032348.bam','SRR4032349.bam','SRR4032352.bam','SRR4032353.bam')]  
+de.data   <- rbind(gene.data,rt.data)
+flag      <- apply(de.data,1,function(x) sum(x>=10) >=4)
+de.data   <- de.data[flag,]
+
+edgeR.res <- DGEList(counts=round(de.data), 
+                     group=factor(c('Wild.type','Wild.type','Dux.OE.GFP.neg','Dux.OE.GFP.neg'),levels = c('Wild.type','Dux.OE.GFP.neg'))
+)
+edgeR.res <- calcNormFactors(edgeR.res, method="RLE")
+
+edgeR.res <- estimateCommonDisp(edgeR.res)
+edgeR.res <- estimateTagwiseDisp(edgeR.res)
+et        <- exactTest(edgeR.res)
+de.res    <- topTags(et, n=Inf)$table
+rt.table  <- de.res[!grepl(x = rownames(de.res),pattern = 'ENS'),]
+
+flag      <- rt.table$FDR<0.01 & rt.table$logFC>1 
+draw.MA.plot(A=rt.table$logCPM,M=rt.table$logFC,significant.flag = flag)
+```
+
+# Section III: Otx2 
+In this section, we show MA plot for OTX2 chip-seq and RNA-Seq 
+###Otx2 chip-seq MA plot
+```{r}
+setwd('~/Project/Martin/')
+load('RData//otx2.csv.chip.seq.results.RData')
+df   <- MA.list[['OTX2.3']]
+flag <- df$fdr<=0.01 & df$M>1
+draw.MA.plot(M=df$M,A=df$A,significant.flag = flag)
+```
+
+###Otx2 RNA-seq MA plot
+```{r}
+setwd('~/Project/Martin/')
+load('RData//otx2.csv.rna.seq.results.RData')
+Dux.id                                <- 'ENSMUSG00000075046.6'
+Otx2.id                               <- 'ENSMUSG00000021848.13'
+
+
+gene.data <- gene.read.count.matrix[,c('SRR1201006.bam','SRR1200997.bam','SRR1200998.bam')]
+rt.data   <- rt.read.count.matrix[,c('SRR1201006.bam','SRR1200997.bam','SRR1200998.bam')]
+de.data   <- rbind(gene.data,rt.data)
+flag      <- apply(de.data,1,function(x) sum(x>=10) >=2)
+de.data   <- de.data[flag,]
+
+edgeR.res <- DGEList(counts=round(de.data), 
+                     group=factor(c('Otx2.OE','Wild.type','Wild.type'),levels = c('Wild.type','Otx2.OE'))
+                     )
+edgeR.res <- calcNormFactors(edgeR.res, method="RLE")
+
+edgeR.res <- estimateCommonDisp(edgeR.res)
+edgeR.res <- estimateTagwiseDisp(edgeR.res)
+et        <- exactTest(edgeR.res)
+de.table  <- topTags(et, n=Inf)$table
+flag      <- de.table$FDR < 0.01 & abs(de.table$logFC) > 1
+draw.MA.plot(A=de.table$logCPM,M=de.table$logFC,significant.flag = flag)
+
+rt.table <- de.table[!grepl(pattern='ENSMUSG',x = rownames(de.table)),]
+flag     <- rt.table$FDR < 0.01 & abs(rt.table$logFC) > 1
+draw.MA.plot(A=rt.table$logCPM,M=rt.table$logFC,significant.flag = flag)
+
+```
+
+# Section IV: Arid3a chip-seq experiment
+```{r}
+setwd('~/Project/Martin/')
+load('RData//Arid3a.csv.chip.seq.results.RData')
+df   <- MA.list[['Arid3a.2']]
+df   <- df[df$A >= 4,]
+flag <- df$fdr < 0.01 & df$M> 1
+
+draw.MA.plot(A=df$A,M=df$M,significant.flag = flag)
+```
+
+# Section IV: Oct4 chip-seq experiment
+```{r}
+setwd('~/Project/Martin/')
+load('RData//oct4.csv.chip.seq.results.RData')
+df   <- MA.list[[1]]
+df   <- df[df$A >= 4,]
+flag <- df$fdr < 0.01 & df$M> 1
+draw.MA.plot(A=df$A,M=df$M,significant.flag = flag)
+```
