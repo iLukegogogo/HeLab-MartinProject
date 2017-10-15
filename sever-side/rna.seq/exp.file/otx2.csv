@@ -1,0 +1,8 @@
+exp.name,ip,input,layout,description
+OTX2.plus.dox.vs.no.dox,SRR1201006,SRR1201005,SINGLE,TF
+OTX2.plus.dox.vs.do.knockout,SRR1201006,SRR1201003,SINGLE,TF
+OTX2.plus.dox.vs.wildtype.1,SRR1201006,SRR1200997,SINGLE,TF
+OTX2.plus.dox.vs.wildtype.2,SRR1201006,SRR1200998,SINGLE,TF
+OTX2.no.dox.vs.do.knockout,SRR1201005,SRR1201003,SINGLE,TF
+OTX2.wildtype.2.vs.do.knockout,SRR1200998,SRR1201003,SINGLE,TF
+OTX2.wildtype.2.vs.no.dox,SRR1200998,SRR1201005,SINGLE,TF

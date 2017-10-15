@@ -1,0 +1,7 @@
+exp.name,ip,input,layout,description
+Dux.dox.pos.vs.neg.1,SRR4032350,SRR4032352,SINGLE,TF
+Dux.dox.pos.vs.neg.2,SRR4032351,SRR4032353,SINGLE,TF
+Dux.dox.neg.vs.no.dox.1,SRR4032352,SRR4032348,SINGLE,TF
+Dux.dox.neg.vs.no.dox.2,SRR4032353,SRR4032349,SINGLE,TF
+Dux.plus.dox.vs.no.dox.1,SRR4032346,SRR4032348,SINGLE,TF
+Dux.plus.dox.vs.no.dox.2,SRR4032347,SRR4032349,SINGLE,TF
