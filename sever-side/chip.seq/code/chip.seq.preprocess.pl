@@ -1,12 +1,17 @@
 #! /usr/bin/perl
-#
-#
+
 use strict;
 my $exp_file      = $ARGV[0];
 
-
-my $BOWTIE2_INDEX        = "/srv/persistent/keliu/genomes/mm10/mm10.index";
 my $RT_GTF_ANNOTATION    = "./annotation/mm10.repbase.gtf";
+
+# Please edit the value of the below variables according to the configuration on your cluster
+my $BOWTIE2_INDEX        = "/srv/persistent/keliu/genomes/mm10/mm10.index";
+my $BOWTIE2  = 'bowtie2 ';
+my $PICARD   = 'java -jar /users/keliu/bin/picard/picard.jar ';
+my $SAMTOOLS = 'samtools ';
+my $PARALLEL =  'parallel '
+my $FEATURECOUNTS = 'featureCounts ';
 
 
 ############# make the necessary directory #########
@@ -84,16 +89,16 @@ foreach my $line (@sra_no){
     my $sra_no = $line;
     
     if ( -e "fastq/${sra_no}_2.fastq.gz" ){
-        $map_cmd    = "bowtie2 $bowtie2_option --no-discordant --no-mixed -X 1000 -x $BOWTIE2_INDEX -1 fastq/${sra_no}_1.fastq.gz -2 fastq/${sra_no}_2.fastq.gz | samtools view -f 2 -bS - | samtools sort -o tmp/${sra_no}.all.bam -T sorted.${sra_no}.all \n";
-        $picard_cmd = "java -jar /users/keliu/bin/picard/picard.jar MarkDuplicates INPUT=tmp/${sra_no}.all.bam  OUTPUT=tmp/${sra_no}.all.rmdup.bam METRICS_FILE=tmp/$sra_no.all.metrics REMOVE_DUPLICATES=true\n";
-        $filter_cmd = "samtools view -b -F 1804    tmp/${sra_no}.all.rmdup.bam        > alignment/${sra_no}.all.rmdup.bam\n";
-        $unique_cmd = "samtools view -b -q 10      alignment/${sra_no}.all.rmdup.bam  > alignment/${sra_no}.unique.rmdup.bam\n";
+        $map_cmd    = "$BOWTIE2 $bowtie2_option --no-discordant --no-mixed -X 1000 -x $BOWTIE2_INDEX -1 fastq/${sra_no}_1.fastq.gz -2 fastq/${sra_no}_2.fastq.gz | $SAMTOOLS view -f 2 -bS - | $SAMTOOLS sort -o tmp/${sra_no}.all.bam -T sorted.${sra_no}.all \n";
+        $picard_cmd = "$PICARD  MarkDuplicates INPUT=tmp/${sra_no}.all.bam  OUTPUT=tmp/${sra_no}.all.rmdup.bam METRICS_FILE=tmp/$sra_no.all.metrics REMOVE_DUPLICATES=true\n";
+        $filter_cmd = "$SAMTOOLS view -b -F 1804    tmp/${sra_no}.all.rmdup.bam        > alignment/${sra_no}.all.rmdup.bam\n";
+        $unique_cmd = "$SAMTOOLS view -b -q 10      alignment/${sra_no}.all.rmdup.bam  > alignment/${sra_no}.unique.rmdup.bam\n";
         
     }else{
-        $map_cmd    = "bowtie2 $bowtie2_option  -x $BOWTIE2_INDEX -U fastq/${sra_no}_1.fastq.gz                                                              | samtools view      -bS - | samtools sort -o tmp/${sra_no}.all.bam -T sorted.${sra_no}.all  \n";
-        $picard_cmd = "java -jar /users/keliu/bin/picard/picard.jar MarkDuplicates INPUT=tmp/${sra_no}.all.bam  OUTPUT=tmp/${sra_no}.all.rmdup.bam METRICS_FILE=tmp/$sra_no.all.metrics REMOVE_DUPLICATES=true\n";
-        $filter_cmd = "samtools view  -b -F 1804   tmp/${sra_no}.all.rmdup.bam        > alignment/${sra_no}.all.rmdup.bam\n";
-        $unique_cmd = "samtools view  -b -q 10     alignment/${sra_no}.all.rmdup.bam  > alignment/${sra_no}.unique.rmdup.bam\n";
+        $map_cmd    = "$BOWTIE2 $bowtie2_option  -x $BOWTIE2_INDEX -U fastq/${sra_no}_1.fastq.gz                                                                | $SAMTOOLS view      -bS - | $SAMTOOLS sort -o tmp/${sra_no}.all.bam -T sorted.${sra_no}.all  \n";
+        $picard_cmd = "$PICARD MarkDuplicates INPUT=tmp/${sra_no}.all.bam  OUTPUT=tmp/${sra_no}.all.rmdup.bam METRICS_FILE=tmp/$sra_no.all.metrics REMOVE_DUPLICATES=true\n";
+        $filter_cmd = "$SAMTOOLS view  -b -F 1804   tmp/${sra_no}.all.rmdup.bam        > alignment/${sra_no}.all.rmdup.bam\n";
+        $unique_cmd = "$SAMTOOLS view  -b -q 10     alignment/${sra_no}.all.rmdup.bam  > alignment/${sra_no}.unique.rmdup.bam\n";
     }
 
     if (! -e "alignment/${sra_no}.all.rmdup.bam"){
@@ -125,9 +130,9 @@ open(OUTFILE,"> tmp/unique_cmd_list");
 print OUTFILE join("",@unique_cmd_list);
 close OUTFILE;
 
-`parallel --no-notice -j 8 < tmp/map_cmd_list`;
-`parallel --no-notice -j 8 < tmp/picard_cmd_list`;
-`parallel --no-notice -j 8 < tmp/filter_cmd_list`;
+`$PARALLEL --no-notice -j 8 < tmp/map_cmd_list`;
+`$PARALLEL --no-notice -j 8 < tmp/picard_cmd_list`;
+`$PARALLEL --no-notice -j 8 < tmp/filter_cmd_list`;
 
 
 ############### use featureCounts to do read counting ############
@@ -137,7 +142,7 @@ my $bam_file      = join("  ",split /\n+/,$out_put);
 my $featureCounts_cmd;
 
 
-$featureCounts_cmd = "featureCounts -a $RT_GTF_ANNOTATION -B -C -p --primary -T 10 -O -M -g repeat -o ../RData/rt.read.count.matrix  $bam_file";
+$featureCounts_cmd = "$FEATURECOUNTS -a $RT_GTF_ANNOTATION -B -C -p --primary -T 10 -O -M -g repeat -o ../RData/rt.read.count.matrix  $bam_file";
 `$featureCounts_cmd`;
 
 

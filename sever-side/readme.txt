@@ -5,6 +5,7 @@ featureCounts
 PICARD
 samtools
 GNU parallel
+STAR
 
 Part II: description
 chip.seq: all code and files needed to reproduce chip-seq results 
