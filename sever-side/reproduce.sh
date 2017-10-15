@@ -4,6 +4,8 @@
 # 2. Edit the file code/chip.seq.preprocess.pl to  fill correct mm10 bowtie2 index
 # 3. Edit the file code/rna.seq.preprocess.pl  to  fill correct mm10  STAR index
 #
+# After running this script, all .RData files needed to reproduce the client-side results could be downloaded under
+# the two folders: chip.seq/RData  nad rna.seq/Rdata 
 #########################
 
 cd chip.seq
