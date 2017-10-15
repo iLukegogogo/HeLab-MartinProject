@@ -11,7 +11,7 @@
 cd chip.seq
 
 cd annotation
-wget http://merlot.lbl.gov/keliu/mm10.annotation/*.gtf
+wget http://merlot.lbl.gov/keliu/HeLab-MartinProject.support.files/mm10.annotation/*.gtf
 wait
 cd ../
 
@@ -35,7 +35,7 @@ wait
 cd ../rna.seq
 
 cd annotation
-wget http://merlot.lbl.gov/keliu/mm10.annotation/*.gtf
+wget http://merlot.lbl.gov/keliu/HeLab-MartinProject.support.files/mm10.annotation/*.gtf
 wait
 cd ../
 
