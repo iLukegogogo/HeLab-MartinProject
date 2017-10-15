@@ -10,6 +10,11 @@
 
 cd chip.seq
 
+cd annotation
+wget http://merlot.lbl.gov/keliu/mm10.annotation/*.gtf
+wait
+cd ../
+
 perl code/chip.seq.preprocess.pl  exp.file/mouse.chip.seq.csv 
 wait
 
@@ -28,6 +33,11 @@ wait
 
 
 cd ../rna.seq
+
+cd annotation
+wget http://merlot.lbl.gov/keliu/mm10.annotation/*.gtf
+wait
+cd ../
 
 perl code/rna.seq.preprocess.pl  exp.file/Dux.dox.csv 
 wait

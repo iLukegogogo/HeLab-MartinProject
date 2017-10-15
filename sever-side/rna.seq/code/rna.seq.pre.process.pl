@@ -6,8 +6,8 @@ my $exp_file      = $ARGV[0];
 
 
 my $STAR_INDEX           = "/srv/persistent/keliu/genomes/mm10.STAR";
-my $RT_GTF_ANNOTATION    = "/users/keliu/project/HeLin/annotation/mm10.repbase.gtf";
-my $GENE_GTF_ANNOTATION  = "/srv/persistent/keliu/genomes/mm10/annotation/gencode.VM6.annotation.gtf";
+my $RT_GTF_ANNOTATION    = "./annotation/mm10.repbase.gtf";
+my $GENE_GTF_ANNOTATION  = "./annotation/gencode.VM6.annotation.gtf";
 
 
 ############# make the necessary directory #########

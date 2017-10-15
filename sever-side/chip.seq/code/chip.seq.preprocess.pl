@@ -5,8 +5,7 @@ my $exp_file      = $ARGV[0];
 
 
 my $BOWTIE2_INDEX        = "/srv/persistent/keliu/genomes/mm10/mm10.index";
-my $RT_GTF_ANNOTATION    = "/users/keliu/project/Martin/mouse.chip.seq/mm10.repbase.and.pseduo.RT.gtf";
-my $GLOBAL_CHR_SIZE_FILE = "/srv/persistent/keliu/genomes/mm10/mm10.chr.size";
+my $RT_GTF_ANNOTATION    = "./annotation/mm10.repbase.gtf";
 
 
 ############# make the necessary directory #########
